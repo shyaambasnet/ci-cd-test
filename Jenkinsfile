@@ -22,10 +22,10 @@ pipeline {
 
         stage('Deploy to Server') {
             steps {
-                // Copy project to remote server
+                // Copy code to remote server
                 sh "rsync -avz --delete ./ ${REMOTE_USER}@${REMOTE_HOST}:${APP_DIR}/"
 
-                // SSH into server, install dependencies, start/restart app with PM2
+                // SSH and start/restart app using PM2
                 sh """
                 ssh ${REMOTE_USER}@${REMOTE_HOST} << EOF
                 cd ${APP_DIR}
