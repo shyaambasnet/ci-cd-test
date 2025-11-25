@@ -1,6 +1,12 @@
 pipeline {
     agent any
 
+    environment {
+        REMOTE_USER = "shyam"
+        REMOTE_HOST = "192.168.10.107"
+        APP_DIR = "/home/shyam/ci-cd-test"
+    }
+
     stages {
         stage('Checkout Code') {
             steps {
@@ -14,9 +20,20 @@ pipeline {
             }
         }
 
-        stage('Run Application') {
+        stage('Deploy to Server') {
             steps {
-                sh 'node index.js'
+                // Copy project to remote server
+                sh "rsync -avz --delete ./ ${REMOTE_USER}@${REMOTE_HOST}:${APP_DIR}/"
+
+                // SSH into server, install dependencies, start/restart app with PM2
+                sh """
+                ssh ${REMOTE_USER}@${REMOTE_HOST} << EOF
+                cd ${APP_DIR}
+                npm install
+                pm2 startOrRestart ecosystem.config.js --env production
+                pm2 save
+                EOF
+                """
             }
         }
     }
