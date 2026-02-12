@@ -2,13 +2,15 @@ pipeline {
     agent any
 
     environment {
-        REMOTE_USER = "shyam"
-        REMOTE_HOST = "192.168.10.107"
-        APP_DIR = "/home/shyam/ci-cd-test"
+        DEPLOY_SERVER = "shyam@192.168.10.112"
+        DEPLOY_PATH = "/home/shyam/ci-cd-test"
+        SSH_CRED = "deploy-key"
+        PATH = "/usr/bin:/usr/local/bin:$PATH"
     }
 
     stages {
-        stage('Checkout Code') {
+
+        stage('Checkout') {
             steps {
                 git branch: 'main', url: 'https://github.com/shyaambasnet/ci-cd-test.git'
             }
@@ -16,26 +18,42 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                sh 'npm install'
+                sh 'npm ci'
             }
         }
 
-        stage('Deploy to Server') {
+        stage('Deploy') {
             steps {
-                // Copy code to remote server
-                sh "rsync -avz --delete ./ ${REMOTE_USER}@${REMOTE_HOST}:${APP_DIR}/"
+                sshagent([env.SSH_CRED]) {
+                    sh """
+                        rsync -avz --delete \
+                        --exclude='node_modules/' \
+                        -e "ssh -o StrictHostKeyChecking=no" \
+                        ./ $DEPLOY_SERVER:$DEPLOY_PATH
 
-                // SSH and start/restart app using PM2
-                sh """
-                ssh ${REMOTE_USER}@${REMOTE_HOST} << EOF
-                cd ${APP_DIR}
-                npm install
-                pm2 startOrRestart ecosystem.config.js --env production
-                pm2 save
-                EOF
-                """
+                        ssh -o StrictHostKeyChecking=no $DEPLOY_SERVER '
+                            cd $DEPLOY_PATH
+                            npm install --production
+
+                            pm2 describe ci-cd-test > /dev/null
+                            if [ \$? -eq 0 ]; then
+                                pm2 restart ci-cd-test
+                            else
+                                pm2 start index.js --name ci-cd-test
+                            fi
+                        '
+                    """
+                }
             }
         }
     }
-}
 
+    post {
+        success {
+            echo "✅ Deployment successful!"
+        }
+        failure {
+            echo "❌ Deployment failed!"
+        }
+    }
+}
