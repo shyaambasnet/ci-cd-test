@@ -6,6 +6,7 @@ pipeline {
         DEPLOY_PATH = "/home/shyam/ci-cd-test"
         SSH_CRED = "deploy-key"
         PATH = "/usr/bin:/usr/local/bin:$PATH"
+        PORT = "3000" 
     }
 
     stages {
